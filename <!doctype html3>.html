@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>商场餐厅转盘</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial;
+      margin: 0;
+      background: #f6f7fb;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+    }
+    h1 { font-size: 18px; margin: 0 0 6px; }
+    .muted { color: #6b7280; font-size: 12px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    select, input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+    }
+    button {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn { background: #111827; color: #fff; }
+    .btn2 { background: #eef2ff; color: #111827; }
+    .btnDanger { background: #fee2e2; color: #7f1d1d; }
+    .item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid #eef2f7;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    .left { display: flex; align-items: center; gap: 8px; }
+    .wheel {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 800;
+      padding: 14px;
+      border-radius: 14px;
+      background: #111827;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+    .rest-name {
+  flex: 1;              /* 占满 checkbox 和 删除按钮中间的空间 */
+  word-break: keep-all; /* 中文不拆字 */
+  line-height: 1.4;
+}
+ .blink { animation: blink .12s linear infinite; }
+    @keyframes blink { 50% { opacity: .85; } }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+
+ 
+  <div class="card">
+    <div class="row">
+      <div style="flex:2">
+        <div class="muted">选择商场</div>
+        <select id="mallSelect"></select>
+      </div>
+      <button class="btn2" id="newMallBtn">新建商场</button>
+      <button class="btn2" id="renameMallBtn">改名</button>
+    </div>
+
+    <div style="margin-top:10px" class="row">
+      <input id="restInput" placeholder="新增餐厅名称" />
+      <button class="btn" id="addBtn">添加</button>
+    </div>
+
+    <div style="margin-top:10px" class="row">
+      <button class="btn2" id="selectAllBtn">全选</button>
+      <button class="btn2" id="clearBtn">清空选择</button>
+      <button class="btnDanger" id="restoreBtn">恢复默认</button>
+    </div>
+
+    <div id="restList" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <div id="result" class="wheel">—</div>
+    <div class="row">
+      <button class="btn" id="spinBtn">开始转盘</button>
+      <button class="btnDanger" id="resetBtn">重置</button>
+    </div>
+    <div class="muted" id="status" style="margin-top:6px">准备就绪</div>
+  </div>
+
+</div>
+
+<script>
+const STORAGE_KEY = "mall_restaurant_wheel_v1";
+const uid = () => Math.random().toString(36).slice(2,10);
+
+// ===== 默认数据（你给的餐厅）=====
+function defaultState() {
+  const mallId = "mall_" + uid();
+
+  const restaurants = [
+    { id: "r_" + uid(), name: "翠河" },
+    { id: "r_" + uid(), name: "意乐" },
+    { id: "r_" + uid(), name: "烧钠" },
+    { id: "r_" + uid(), name: "手c鸡" },
+    { id: "r_" + uid(), name: "太子" },
+    { id: "r_" + uid(), name: "谭仔米线" },
+    { id: "r_" + uid(), name: "KFC" },
+    { id: "r_" + uid(), name: "M" },
+    { id: "r_" + uid(), name: "渔乐" },
+    { id: "r_" + uid(), name: "大快活" }
+  ];
+
+  return {
+    activeMallId: mallId,
+    malls: [
+      {
+        id: mallId,
+        mallName: "富泰",
+        restaurants,
+        selectedIds: restaurants.map(r => r.id) // 默认全选
+      }
+    ]
+  };
+}
+
+// ===== 状态 =====
+let state = loadState();
+let spinning = false;
+let timer = null;
+
+// ===== DOM =====
+const mallSelect = document.getElementById("mallSelect");
+const restList = document.getElementById("restList");
+const restInput = document.getElementById("restInput");
+const result = document.getElementById("result");
+const status = document.getElementById("status");
+
+// ===== 工具 =====
+function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  return raw ? JSON.parse(raw) : defaultState();
+}
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+function activeMall() {
+  return state.malls.find(m => m.id === state.activeMallId);
+}
+
+// ===== 渲染 =====
+function render() {
+  mallSelect.innerHTML = "";
+  state.malls.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = m.mallName;
+    if (m.id === state.activeMallId) opt.selected = true;
+    mallSelect.appendChild(opt);
+  });
+
+  const mall = activeMall();
+  restList.innerHTML = "";
+
+  mall.restaurants.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "item";
+
+    const left = document.createElement("div");
+    left.className = "left";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = mall.selectedIds.includes(r.id);
+    cb.onchange = () => toggle(r.id, cb.checked);
+
+   const name = document.createElement("div");
+name.className = "rest-name";
+name.textContent = r.name;
+ 
+
+
+
+    left.appendChild(cb);
+    left.appendChild(name);
+
+    const del = document.createElement("button");
+    del.className = "btnDanger";
+    del.textContent = "删";
+    del.onclick = () => remove(r.id);
+
+    div.appendChild(left);
+    div.appendChild(del);
+    restList.appendChild(div);
+  });
+
+  saveState();
+}
+
+// ===== 操作 =====
+function toggle(id, on) {
+  const m = activeMall();
+  const set = new Set(m.selectedIds);
+  on ? set.add(id) : set.delete(id);
+  m.selectedIds = [...set];
+  render();
+}
+function remove(id) {
+  const m = activeMall();
+  m.restaurants = m.restaurants.filter(r => r.id !== id);
+  m.selectedIds = m.selectedIds.filter(x => x !== id);
+  render();
+}
+function spin() {
+  const m = activeMall();
+  const list = m.restaurants.filter(r => m.selectedIds.includes(r.id));
+  if (!list.length) {
+    status.textContent = "请先选择餐厅";
+    return;
+  }
+  if (spinning) return;
+
+  spinning = true;
+  status.textContent = "转盘中…";
+  result.classList.add("blink");
+
+  let i = 0;
+  timer = setInterval(() => {
+    result.textContent = list[i % list.length].name;
+    i++;
+  }, 70);
+
+  setTimeout(() => {
+    clearInterval(timer);
+    result.classList.remove("blink");
+    result.textContent = list[Math.floor(Math.random()*list.length)].name;
+    status.textContent = "✅ 已选出";
+    spinning = false;
+  }, 1500);
+}
+
+// ===== 事件 =====
+document.getElementById("spinBtn").onclick = spin;
+document.getElementById("resetBtn").onclick = () => result.textContent = "—";
+document.getElementById("addBtn").onclick = () => {
+  const v = restInput.value.trim();
+  if (!v) return;
+  const m = activeMall();
+  const id = "r_" + uid();
+  m.restaurants.unshift({ id, name: v });
+  m.selectedIds.push(id);
+  restInput.value = "";
+  render();
+};
+document.getElementById("selectAllBtn").onclick = () => {
+  const m = activeMall();
+  m.selectedIds = m.restaurants.map(r => r.id);
+  render();
+};
+document.getElementById("clearBtn").onclick = () => {
+  activeMall().selectedIds = [];
+  render();
+};
+document.getElementById("newMallBtn").onclick = () => {
+  const name = prompt("商场名称");
+  if (!name) return;
+  const id = "mall_" + uid();
+  state.malls.push({ id, mallName: name, restaurants: [], selectedIds: [] });
+  state.activeMallId = id;
+  render();
+};
+document.getElementById("renameMallBtn").onclick = () => {
+  const m = activeMall();
+  const n = prompt("新名称", m.mallName);
+  if (n) m.mallName = n;
+  render();
+};
+mallSelect.onchange = () => {
+  state.activeMallId = mallSelect.value;
+  render();
+};
+document.getElementById("restoreBtn").onclick = () => {
+  if (!confirm("确定恢复默认餐厅库吗？这会覆盖你本地保存的内容。")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = loadState();   // 重新从 defaultState 生成
+  result.textContent = "—";
+  render();
+};
+
+// ===== 启动 =====
+render();
+</script>
+</body>
+</html>
