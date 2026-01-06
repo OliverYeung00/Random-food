@@ -5,12 +5,19 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>商场餐厅转盘</title>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial;
-      margin: 0;
-      background: #f6f7fb;
-    }
+   body {
+  font-family: -apple-system, BlinkMacSystemFont,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+   html {
+  -webkit-text-size-adjust: 100%;
+}
+
     .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
     .card {
       background: #fff;
@@ -46,7 +53,12 @@
       padding: 10px;
       margin-bottom: 8px;
     }
-    .left { display: flex; align-items: center; gap: 8px; }
+.left {
+  display: flex;
+  align-items: center;
+  min-height: 44px;   /* ⭐ 统一高度，iOS 友好 */
+}
+
     .wheel {
       text-align: center;
       font-size: 28px;
@@ -58,9 +70,12 @@
       margin-bottom: 10px;
     }
     .rest-name {
-  flex: 1;              /* 占满 checkbox 和 删除按钮中间的空间 */
-  word-break: keep-all; /* 中文不拆字 */
+  flex: 1;
+  font-size: 16px;
   line-height: 1.4;
+  word-break: keep-all;
+  display: flex;
+  align-items: center;   /* ⭐ 关键：文字自身也垂直居中 */
 }
  .blink { animation: blink .12s linear infinite; }
     @keyframes blink { 50% { opacity: .85; } }
